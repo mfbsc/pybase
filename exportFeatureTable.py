@@ -5,6 +5,7 @@
 import csv
 import itertools
 import os
+import sqlite3
 
 # libs for feature class
 #from urllib.request import urlretrieve
@@ -34,37 +35,49 @@ for f in files:
   counter += 1
 
 ## return selected file to output
-valueOfFileIndex = input("Enter featureXML index: ") - 1
-print('File selection: ' + indexedFiles[valueOfFileIndex] + '\n')
+## changed for testing purposes
+#valueOfFileIndex = input("Enter featureXML index: ") - 1
+#print('File selection: ' + indexedFiles[valueOfFileIndex] + '\n')
 
 ## read FeatureMap
 features = FeatureMap()
 filehandle = FeatureXMLFile()
+
 #fh.load("output.featureXML", features)
-filehandle.load(indexedFiles[valueOfFileIndex], features)
+
+## changed for testing purposes
+#filehandle.load(indexedFiles[valueOfFileIndex], features)
+filehandle.load(indexedFiles[1], features)
 #1st sanity check
 print("Found " + str(features.size()) + " features")
 #store in separate file as backup?
 #FeatureXMLFile().store("test.out.featureXML", features)
 ##preliminary output to console
+### user params
+
+
+'''
+#print(type(features))
+fdp = features.getDataProcessing()
+print(type(fdp))
+print(fdp.getSoftware())
+
+# Todo without loops
+# get labels for first column description
+#for feature in itertools.islice(features, 0, 1):
+#  print(feature.getRT())
+#  k = []  # start with empty list to fill with key-value pairs
+#  feature.getKeys(k) # explore available key-value pairs
+#  for userparam in k:
+'''
+
+
+
 
 
 # define parameter strings to export to csv
-feature_Elements = ["FeatureId", "RTvalue", "MZratio", "Intensity", "Charge", "Quality"] 
-subordinate_Elements = ["SubordinateId", "RTvalue", "MZratio", "Intensity", "Charge", "Quality"] 
-
-### user params
-
-'''
-# Todo without loops
-# get labels for first column description
-for feature in itertools.islice(features, 0, 1):
-  k = []  # start with empty list to fill with key-value pairs
-  feature.getKeys(k) # explore available key-value pairs
-  for userparam in k:
-    feature_labels.append(userparam)
-    subordinate_labels.append(userparam)
-'''
+feature_Elements = ["ID", "RT", "MZ", "Intensity", "Charge", "Quality"] 
+subordinate_Elements = ["ID", "Feature_ref", "RT", "featureMZ", "Intensity", "Charge", "Quality"] 
 
 ## export routine to save as csv
 ## files: feature.csv, subordinate.csv
@@ -75,7 +88,8 @@ with open('feature.csv', 'wb') as featurefile:
 
   # feature file with parameters
   row_counter = 0
-  for feature in features:
+  for feature in itertools.islice(features, 0, 1):
+  #for feature in features:
     currentrow = []
     feature_userparams_labels = []
     featureselect = (feature.getUniqueId(), feature.getRT(), feature.getMZ() , feature.getIntensity(), feature.getCharge(), feature.getOverallQuality())
@@ -89,10 +103,8 @@ with open('feature.csv', 'wb') as featurefile:
     for userparam in key:
       feature_userparams_labels.append(userparam) 
       currentrow.append(feature.getMetaValue(userparam))
-
       #write header row to file
       feature_param_Elements = feature_Elements + feature_userparams_labels
-
 
     if row_counter == 0:
       row_counter = 1
@@ -105,149 +117,188 @@ with open('feature.csv', 'wb') as featurefile:
       featurewriter.writerow(currentrow)
 
 
+
 with open('subordinate.csv', 'wb') as subordinatefile:
   subordinatewriter = csv.writer(subordinatefile, delimiter='\t', lineterminator='\n')
   # subordinate file with parameters
   currentrow = []
   row_counter = 0
-  subord_userparams_labels = []
+  #subord_userparams_labels = []
+  #for feature in itertools.islice(features, 0, 1):
   for feature in features:
-    subord_userparams_labels = subordinate_Elements
-    key_sub = []
+    #subordinate_userparams_labels = subordinate_Elements
+    
     if feature.getSubordinates():
       subordinates = feature.getSubordinates()
-      currentrow = []
+      #currentrow = []
       for subordinate in subordinates:
-        subordinateselect = (subordinate.getUniqueId(), subordinate.getRT(), subordinate.getMZ() , subordinate.getIntensity(), subordinate.getCharge(), subordinate.getOverallQuality())
+        currentrow = []
+        subordinate_userparams_labels = []
+        key_sub = []
+
+        subordinateselect = (subordinate.getUniqueId(), feature.getUniqueId() , subordinate.getRT(), subordinate.getMZ() , subordinate.getIntensity(), subordinate.getCharge(), subordinate.getOverallQuality())
         currentrow.extend(list(subordinateselect))
+        
         subordinate.getKeys(key_sub)
+
+        
+        typeValue = []
         for userparam in key_sub:
-          subord_userparams_labels.append(userparam)
+          # playtime
+          test = subordinate.getMetaValue(userparam)
+          #test = feature.getMetaValue(userparam)
+          #test1 = feature.valueType()
+          #print(test1)
+          #print(str(test))
+          #print(type(test))
+          #if (type(test) is float):
+          #  print("float")
+          #print(test.__class__.__name__)
+          
+          typeValue.append(test.__class__.__name__)     
+          #typeofpara = test.valueType()
+
+          subordinate_userparams_labels.append(userparam) 
           currentrow.append(subordinate.getMetaValue(userparam))
 
-      if row_counter == 0:
-        row_counter = 1
-        subordinatefile.write('\t'.join(subord_userparams_labels) + '\n')
-        subordinatewriter.writerow(currentrow)
-      else:
-        subordinatewriter.writerow(currentrow)
+        if row_counter == 0:          
+          row_counter = 1
+          #print(subordinate_Elements)
+          #write header row to file
+          subordinate_param_Elements = subordinate_Elements + subordinate_userparams_labels
+          subordinatefile.write('\t'.join(subordinate_param_Elements) + '\n')
+
+          subordinatewriter.writerow(currentrow)
+        else:
+          subordinatewriter.writerow(currentrow)
+        #print(len(subordinate_userparams_labels))
+
+        #print(typeValue)
+
+
+## database handling
+
+
+conn = sqlite3.connect('quantitative.db')
+#conn = sqlite3.connect(":memory:")
+print("Opened database successfully")
+
+c = conn.cursor()
 
 
 
-'''
-#loop across subordinates
-#loop across user params
-feature columns + param columns
-# subordinates + params
-subordinate columns + param columns
+tablecolumnlabel = []
+tablecolumntype  = []
+sqlcreateTableElements = []
+
+for elem in typeValue:
+  if elem == 'integer':
+    #print("integer")
+    tablecolumnlabel.append("")
+    tablecolumntype.append("integer")  
+  elif elem == 'float':
+    #print("float")
+    tablecolumnlabel.append("")
+    tablecolumntype.append("real")
+  elif elem == 'str':
+    #print("text")
+    tablecolumnlabel.append("")
+    tablecolumntype.append("text")
+  elif elem == 'IntegerList':
+    #print("integer")
+    tablecolumnlabel.append("_IL_")
+    tablecolumntype.append("text")  
+  elif elem == 'FloatList':
+    #print("float")
+    tablecolumnlabel.append("_FL_")
+    tablecolumntype.append("real")
+  elif elem == 'StringList':
+    #print("text")
+    tablecolumnlabel.append("_SL_")
+    tablecolumntype.append("text")
+  else:
+    print("type error")
 
 
-## export routine to save into csv
-## files: feature.csv, subordinate.csv, feature_params.csv, subordinate_params.csv
-## https://stackoverflow.com/questions/4617034/how-can-i-open-multiple-files-using-with-open-in-python
-with\
-  open('feature.csv', 'wb') as featurefile,\
-  open('subordinate.csv', 'wb') as subordinatefile:
-  featurewriter = csv.writer(featurefile, delimiter="\t", lineterminator='\n')
-  subordinatewriter = csv.writer(subordinatefile, delimiter='\t', lineterminator='\n')
+#print(tablecolumnlabel)
+#print(tablecolumntype)
+print("\n")
+#print(tablecolumntype)
+#print(subordinate_Elements)
+subordinate_Elements_type = ["integer", "integer", "real", "real", "real", "integer", "real"]
+subordinate_Elements_type_prefixes = ["", "", "", "", "", "", ""]
 
-  featurefile.write("feature Id \t\t\t\t  RT value \t\t\t\t  MZ ratio \t\t\t\t  Intensity \t\t Charge \t\t Quality \t\t" + '\n')
-  subordinatefile.write("RT value \t\t\t\t  MZ ratio \t\t\t\t  Intensity \t\t Charge \t\t Quality \t\t\t\t subordinate Id " + '\n')
-
-  print(featureElements)
-  #for feature in features:
-  for feature in itertools.islice(features, 0, 4):
-    featureselect = (feature.getUniqueId(), feature.getRT(), feature.getMZ() , feature.getIntensity(), feature.getCharge(), feature.getOverallQuality())  
-    featurewriter.writerow(featureselect)
-    print('\t'.join(map(str, featureselect)))
-    # check for subordinates if true
-    if feature.getSubordinates():
-      subordinates = feature.getSubordinates()
-      print("   Subordinate Id")
-      for subordinate in subordinates:
-        subordinateselect1 = (subordinate.getUniqueId(), subordinate.getRT(), subordinate.getMZ() , subordinate.getIntensity(), subordinate.getCharge(), subordinate.getOverallQuality())
-        subordinateselect2 = (subordinate.getRT(), subordinate.getMZ() , subordinate.getIntensity(), subordinate.getCharge(), subordinate.getOverallQuality(), subordinate.getUniqueId())
-
-        subordinatewriter.writerow(subordinateselect2)
-        print("   " + '\t'.join(map(str, subordinateselect1)))
+#tablecolumnlabel = ["_SL_","","","","","","","_IL_","","","","","_FL_","",""]
+subordinate_Elements_type_prefixes += tablecolumnlabel
 
 
-# user parameter files
-# fetch feature user params
-#for feature in features:
-for feature in itertools.islice(features, 0, 6):
-  currentcolumn = []   #column with current user param values
-  k = []  # start with empty list to fill with key-value pairs
-  feature.getKeys(k) # explore available key-value pairs
-  currentcolumn.append(feature.getUniqueId())
-  for userparam in k:
-    currentcolumn.append(feature.getMetaValue(userparam))
-  columns.append(currentcolumn)
+sqlcolumntype = subordinate_Elements_type + tablecolumntype
+#print(sqlcolumntype)
+print("imhere")
+#print(subordinate_param_Elements)
 
-feature_params  = zip(feature_labels, *columns)
-with open('feature_params.csv','wb') as paramfile:
-  writer = csv.writer(paramfile, delimiter='\t')  #, lineterminator='\n')
-  writer.writerows(feature_params)
+for elem, s in enumerate(sqlcolumntype):
+  #print(elem)
+  #print(s)
+  #print(subordinate_param_Elements[elem])
+  #sqlcreateTableElements.append(subordinate_param_Elements[elem]  + " " + sqlcolumntype[elem])   
+  sqlcreateTableElements.append(subordinate_Elements_type_prefixes[elem] + subordinate_param_Elements[elem]  + " " + sqlcolumntype[elem])   
+  
+print(sqlcreateTableElements)
+print(', '.join(sqlcreateTableElements))
+textinsert = (', '.join(sqlcreateTableElements))
+print("\n")
+
+print(textinsert)
+executeString = "CREATE TABLE features (" + textinsert + ");"
+
+print(type(executeString))
+print("\n")
+print(executeString)
+
+
+c.execute(executeString)
+#c.execute("CREATE TABLE features (ID integer,Feature_ref integer,RT real,MZ real,Intensity real,Charge	integer,Quality real,MZ1	real,peak_apex_position real,native_id text,peak_apex_int real,total_xic real,width_at_50 real,logSN real,isotope_probability real);")
 
 
 
+with open('subordinate.csv', 'rb') as subordinatefile:
+  dr = csv.DictReader(subordinatefile, delimiter='\t')
+  to_db = [(i['ID'],\
+            i['Feature_ref'],\
+            i['RT'],\
+            i['featureMZ'],\
+            i['Intensity'],\
+            i['Charge'],\
+            i['Quality'],\
+            i['MZ'],\
+            i['peak_apex_position'],\
+            i['native_id'],\
+            i['peak_apex_int'],\
+            i['total_xic'],\
+            i['width_at_50'],\
+            i['logSN'],\
+            i['isotope_probability'],\
+  ) for i in dr]
+
+c.executemany("INSERT INTO features \
+  (ID,\
+   Feature_ref,\
+   RT,\
+   featureMZ,\
+   Intensity,\
+   Charge,\
+   Quality,\
+   MZ,\
+   peak_apex_position,\
+   native_id,\
+   peak_apex_int,\
+   total_xic,\
+   width_at_50,\
+   logSN,\
+   isotope_probability\
+  ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", to_db)
+conn.commit()
+conn.close()
 
 
-
-
-
-## export routine to save into csv
-## files: feature.csv, subordinate.csv, feature_params.csv, subordinate_params.csv
-## https://stackoverflow.com/questions/4617034/how-can-i-open-multiple-files-using-with-open-in-python
-with\
-  open('feature.csv', 'wb') as featurefile,\
-  open('subordinate.csv', 'wb') as subordinatefile:
-  featurewriter = csv.writer(featurefile, delimiter="\t", lineterminator='\n')
-  subordinatewriter = csv.writer(subordinatefile, delimiter='\t', lineterminator='\n')
-
-  featurefile.write("feature Id \t\t\t\t  RT value \t\t\t\t  MZ ratio \t\t\t\t  Intensity \t\t Charge \t\t Quality \t\t" + '\n')
-  subordinatefile.write("RT value \t\t\t\t  MZ ratio \t\t\t\t  Intensity \t\t Charge \t\t Quality \t\t\t\t subordinate Id " + '\n')
-
-  print(featureElements)
-  #for feature in features:
-  for feature in itertools.islice(features, 0, 4):
-    featureselect = (feature.getUniqueId(), feature.getRT(), feature.getMZ() , feature.getIntensity(), feature.getCharge(), feature.getOverallQuality())  
-    featurewriter.writerow(featureselect)
-    print('\t'.join(map(str, featureselect)))
-    # check for subordinates if true
-    if feature.getSubordinates():
-      subordinates = feature.getSubordinates()
-      print("   Subordinate Id")
-      for subordinate in subordinates:
-        subordinateselect1 = (subordinate.getUniqueId(), subordinate.getRT(), subordinate.getMZ() , subordinate.getIntensity(), subordinate.getCharge(), subordinate.getOverallQuality())
-        subordinateselect2 = (subordinate.getRT(), subordinate.getMZ() , subordinate.getIntensity(), subordinate.getCharge(), subordinate.getOverallQuality(), subordinate.getUniqueId())
-
-        subordinatewriter.writerow(subordinateselect2)
-        print("   " + '\t'.join(map(str, subordinateselect1)))
-
-
-# fetch subordinate user params
-#for feature in features:
-subordinate_labels.append("Subordinate Id")  #Id, label columns columns with id, rows with labels 
-for feature in itertools.islice(features, 0, 1):
-  columns = []
-  if feature.getSubordinates():
-    subordinates = feature.getSubordinates()
-    for subordinate in subordinates:
-      currentcolumn = []   #column with current user param values
-      k = []  # start with empty list to fill with key-value pairs
-      subordinate.getKeys(k) # explore available key-value pairs
-      currentcolumn.append(subordinate.getUniqueId())
-      for userparam in k:
-        currentcolumn.append(subordinate.getMetaValue(userparam))
-      columns.append(currentcolumn)
-
-print(columns)
-
-subordinate_params = zip(subordinate_labels, *columns)
-with open('subordinate_params.csv','wb') as paramfile:
-  writer = csv.writer(paramfile, delimiter='\t')  #, lineterminator='\n')
-  writer.writerows(subordinate_params)
-
-
-'''
