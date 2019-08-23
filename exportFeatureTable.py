@@ -6,11 +6,38 @@ import csv
 import itertools
 import os
 import sqlite3
+import enum
 
 # libs for feature class
 #from urllib.request import urlretrieve
 from urllib import urlretrieve  # use this code for Python 2.x
 from pyopenms import *
+
+
+
+
+def duplicate(feature_Elements, subordinate_userparams_labels):
+  duplicates = []
+  feature_Elements_set = set(feature_Elements)
+  subordinate_userparams_labels_set = set(subordinate_userparams_labels)
+  if (feature_Elements_set & subordinate_userparams_labels_set):
+    #print(a_set & b_set)
+    duplicates = list(feature_Elements_set & subordinate_userparams_labels_set)
+    #print(duplicates)
+  else:
+    print("no common elements")
+
+  for elem,s in enumerate(subordinate_userparams_labels):
+    if s in duplicates:
+      #print("is in")
+      subordinate_userparams_labels[elem] = "_" + subordinate_userparams_labels[elem]
+    #else:
+      #print("is out")
+
+
+
+
+
 
 ## variable definition
 ##input section
@@ -56,11 +83,14 @@ print("Found " + str(features.size()) + " features")
 ### user params
 
 
-'''
+
 #print(type(features))
-fdp = features.getDataProcessing()
-print(type(fdp))
-print(fdp.getSoftware())
+dpo = features.getDataProcessing()
+print(type(dpo))
+print("\n")
+
+
+
 
 # Todo without loops
 # get labels for first column description
@@ -69,15 +99,28 @@ print(fdp.getSoftware())
 #  k = []  # start with empty list to fill with key-value pairs
 #  feature.getKeys(k) # explore available key-value pairs
 #  for userparam in k:
-'''
-
-
-
 
 
 # define parameter strings to export to csv
 feature_Elements = ["ID", "RT", "MZ", "Intensity", "Charge", "Quality"] 
-subordinate_Elements = ["ID", "Feature_ref", "RT", "featureMZ", "Intensity", "Charge", "Quality"] 
+subordinate_Elements = ["ID", "Feature_ref", "RT", "MZ", "Intensity", "Charge", "Quality"] 
+
+
+
+
+## database handling
+conn = sqlite3.connect('quantitative.db')
+#conn = sqlite3.connect(":memory:")
+print("Opened database successfully")
+c = conn.cursor()
+
+
+
+# clear existing table
+#c.execute("DROP TABLE features")
+#c.execute("DROP TABLE subordinates")
+#c.execute("DROP TABLE dataproc")
+
 
 ## export routine to save as csv
 ## files: feature.csv, subordinate.csv
@@ -99,8 +142,13 @@ with open('feature.csv', 'wb') as featurefile:
 
     # build list of current row with featureselect and userparams
     currentrow.extend(list(featureselect))
-    cnt = 1
+    typeValue = []
     for userparam in key:
+      test_feat = feature.getMetaValue(userparam)
+      #print(test_feat)
+      typeValue.append(test_feat.__class__.__name__)     
+
+
       feature_userparams_labels.append(userparam) 
       currentrow.append(feature.getMetaValue(userparam))
       #write header row to file
@@ -116,6 +164,163 @@ with open('feature.csv', 'wb') as featurefile:
       #print(len(currentrow))
       featurewriter.writerow(currentrow)
 
+#print(typeValue)
+print(len(typeValue))
+
+print("\n")
+
+## feature table
+tablecolumnlabel = []
+tablecolumntype  = []
+sqlcreateTableElements = []
+
+for elem in typeValue:
+  if elem == 'int':
+    #print("integer")
+    tablecolumnlabel.append("")
+    tablecolumntype.append("integer")  
+  elif elem == 'float':
+    #print("float")
+    tablecolumnlabel.append("")
+    tablecolumntype.append("real")
+  elif elem == 'str':
+    #print("text")
+    tablecolumnlabel.append("")
+    tablecolumntype.append("text")
+  elif elem == 'list':
+    if (elem.__class__.__name__) == 'int':
+      tablecolumnlabel.append("_IL_")
+      tablecolumntype.append("integer") 
+    elif (elem.__class__.__name__) == 'float':
+      tablecolumnlabel.append("_FL_")
+      tablecolumntype.append("real")
+    elif (elem.__class__.__name__) == 'str':
+      tablecolumnlabel.append("")
+      tablecolumntype.append("text")
+  #change   
+  else:
+    print("type error")
+    print(elem)
+
+'''
+#change 
+#check for getType() function and replace typeValue module
+
+elif elem == 'IntegerList':
+  #print("integer")
+  tablecolumnlabel.append("_IL_")
+  tablecolumntype.append("integer")  
+elif elem == 'FloatList':
+  #print("float")
+  tablecolumnlabel.append("_FL_")
+  tablecolumntype.append("real")
+elif elem == 'StringList':
+  #print("text")
+  tablecolumnlabel.append("_SL_")
+  tablecolumntype.append("text")
+#change
+'''
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+'''
+
+
+
+
+
+
 
 
 with open('subordinate.csv', 'wb') as subordinatefile:
@@ -125,9 +330,7 @@ with open('subordinate.csv', 'wb') as subordinatefile:
   row_counter = 0
   #subord_userparams_labels = []
   #for feature in itertools.islice(features, 0, 1):
-  for feature in features:
-    #subordinate_userparams_labels = subordinate_Elements
-    
+  for feature in features:    
     if feature.getSubordinates():
       subordinates = feature.getSubordinates()
       #currentrow = []
@@ -135,12 +338,9 @@ with open('subordinate.csv', 'wb') as subordinatefile:
         currentrow = []
         subordinate_userparams_labels = []
         key_sub = []
-
         subordinateselect = (subordinate.getUniqueId(), feature.getUniqueId() , subordinate.getRT(), subordinate.getMZ() , subordinate.getIntensity(), subordinate.getCharge(), subordinate.getOverallQuality())
         currentrow.extend(list(subordinateselect))
-        
         subordinate.getKeys(key_sub)
-
         
         typeValue = []
         for userparam in key_sub:
@@ -165,34 +365,33 @@ with open('subordinate.csv', 'wb') as subordinatefile:
           row_counter = 1
           #print(subordinate_Elements)
           #write header row to file
+          #check for duplicates in feature_Elements_set and subordinate_userparams_labels
+          duplicate(feature_Elements, subordinate_userparams_labels)
+
           subordinate_param_Elements = subordinate_Elements + subordinate_userparams_labels
           subordinatefile.write('\t'.join(subordinate_param_Elements) + '\n')
-
           subordinatewriter.writerow(currentrow)
         else:
           subordinatewriter.writerow(currentrow)
         #print(len(subordinate_userparams_labels))
-
         #print(typeValue)
 
 
-## database handling
-
-
-conn = sqlite3.connect('quantitative.db')
-#conn = sqlite3.connect(":memory:")
-print("Opened database successfully")
-
-c = conn.cursor()
 
 
 
+
+
+
+
+
+## subordinate table
 tablecolumnlabel = []
 tablecolumntype  = []
 sqlcreateTableElements = []
 
 for elem in typeValue:
-  if elem == 'integer':
+  if elem == 'int':
     #print("integer")
     tablecolumnlabel.append("")
     tablecolumntype.append("integer")  
@@ -230,12 +429,7 @@ subordinate_Elements_type_prefixes = ["", "", "", "", "", "", ""]
 
 #tablecolumnlabel = ["_SL_","","","","","","","_IL_","","","","","_FL_","",""]
 subordinate_Elements_type_prefixes += tablecolumnlabel
-
-
 sqlcolumntype = subordinate_Elements_type + tablecolumntype
-#print(sqlcolumntype)
-print("imhere")
-#print(subordinate_param_Elements)
 
 for elem, s in enumerate(sqlcolumntype):
   #print(elem)
@@ -244,22 +438,26 @@ for elem, s in enumerate(sqlcolumntype):
   #sqlcreateTableElements.append(subordinate_param_Elements[elem]  + " " + sqlcolumntype[elem])   
   sqlcreateTableElements.append(subordinate_Elements_type_prefixes[elem] + subordinate_param_Elements[elem]  + " " + sqlcolumntype[elem])   
   
-print(sqlcreateTableElements)
-print(', '.join(sqlcreateTableElements))
+#print(sqlcreateTableElements)
+#print(', '.join(sqlcreateTableElements))
 textinsert = (', '.join(sqlcreateTableElements))
 print("\n")
 
-print(textinsert)
-executeString = "CREATE TABLE features (" + textinsert + ");"
+#print(textinsert)
 
-print(type(executeString))
+
+
+
+
+executeString = "CREATE TABLE subordinates (" + textinsert + ");"
+
+#print(type(executeString))
 print("\n")
-print(executeString)
+#print(executeString)
 
 
 c.execute(executeString)
 #c.execute("CREATE TABLE features (ID integer,Feature_ref integer,RT real,MZ real,Intensity real,Charge	integer,Quality real,MZ1	real,peak_apex_position real,native_id text,peak_apex_int real,total_xic real,width_at_50 real,logSN real,isotope_probability real);")
-
 
 
 with open('subordinate.csv', 'rb') as subordinatefile:
@@ -267,11 +465,11 @@ with open('subordinate.csv', 'rb') as subordinatefile:
   to_db = [(i['ID'],\
             i['Feature_ref'],\
             i['RT'],\
-            i['featureMZ'],\
+            i['MZ'],\
             i['Intensity'],\
             i['Charge'],\
             i['Quality'],\
-            i['MZ'],\
+            i['_MZ'],\
             i['peak_apex_position'],\
             i['native_id'],\
             i['peak_apex_int'],\
@@ -281,15 +479,15 @@ with open('subordinate.csv', 'rb') as subordinatefile:
             i['isotope_probability'],\
   ) for i in dr]
 
-c.executemany("INSERT INTO features \
+c.executemany("INSERT INTO subordinates \
   (ID,\
    Feature_ref,\
    RT,\
-   featureMZ,\
+   MZ,\
    Intensity,\
    Charge,\
    Quality,\
-   MZ,\
+   _MZ,\
    peak_apex_position,\
    native_id,\
    peak_apex_int,\
@@ -301,4 +499,5 @@ c.executemany("INSERT INTO features \
 conn.commit()
 conn.close()
 
+'''
 
