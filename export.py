@@ -21,12 +21,12 @@ import enum
 ## functions
 
 # check feature and userparameter entries for duplicate entries, mark userparameters labels with prefix '_'
-def duplicateFinder(feature_Elements, userparams_elements):
+def duplicateFinder(feature_elements, userparams_elements):
   duplicates = []
-  feature_Elements_set = set(feature_Elements)
+  feature_elements_set = set(feature_elements)
   userparams_elements_set = set(userparams_elements)
-  if (feature_Elements_set & userparams_elements_set):
-    duplicates = list(feature_Elements_set & userparams_elements_set)
+  if (feature_elements_set & userparams_elements_set):
+    duplicates = list(feature_elements_set & userparams_elements_set)
   for elem,s in enumerate(userparams_elements):
     if s in duplicates:
       userparams_elements[elem] = "_" + userparams_elements[elem]
@@ -66,7 +66,7 @@ def prefixLabel(csv_label_type):
   return table_column_label, table_column_type
 
 
-def formatSQLEntries(elements, elements_types): #subordinate_userparam_elements, userparams_elements_types):
+def formatSQLEntries(elements, elements_types, elements_type, elements_types_prefixes): #subordinate_userparam_elements, userparams_elements_types, subordinate_elements_type_prefixes):
 # construct table entries from combined subordinate and userparameter elements
 # add prefixes for naming convention 
 # return table entries and types respectively 
@@ -74,8 +74,8 @@ def formatSQLEntries(elements, elements_types): #subordinate_userparam_elements,
 # concatenate pre-, suffixes if applicable 
   dynamic_column_prefixes, dynamic_column_types = prefixLabel(elements_types)
 
-  sql_column_types_prefixes = subordinate_elements_type_prefixes + dynamic_column_prefixes
-  sql_column_types = subordinate_elements_type + dynamic_column_types
+  sql_column_types_prefixes = elements_types_prefixes + dynamic_column_prefixes
+  sql_column_types = elements_type + dynamic_column_types
 
   sql_header = []
   sql_table_elements = []
@@ -89,6 +89,8 @@ def formatSQLEntries(elements, elements_types): #subordinate_userparam_elements,
 
 def createSQLTable(sql_header, sql_header_types, csv_file, db_filename):
   f = open(csv_file, 'rU')
+  filename = csv_file.split(".")
+  filename = filename[0]
   reader = csv.reader(f, delimiter = '\t')
   
   conn = sqlite3.connect(db_filename)
@@ -97,12 +99,12 @@ def createSQLTable(sql_header, sql_header_types, csv_file, db_filename):
   table_string = []
   for elem,s in enumerate(sql_header):
     table_string.append(sql_header[elem] + " " + sql_header_types[elem])
-    
+
   table_string = (', '.join(table_string))
-  create_table_string = "CREATE TABLE subordinates (" + table_string + ");"
+  create_table_string = "CREATE TABLE "+ filename +" (" + table_string + ");"
   c.execute(create_table_string)
 
-  dynamic_values = "INSERT INTO subordinates (" + \
+  dynamic_values = "INSERT INTO "+ filename +" (" + \
                        str(', '.join(sql_header)) + \
                        ") VALUES (" + \
                        str("?," * (len(sql_header)-1)) + "?" + \
@@ -160,8 +162,6 @@ print("Found " + str(features.size()) + " features")
 
 
 
-#dpo = features.getDataProcessing()
-
 
 # Todo without loops
 # get labels for first column description
@@ -175,12 +175,18 @@ print("Found " + str(features.size()) + " features")
 # define parameters and types to export to csv
 feature_elements = ["ID", "RT", "MZ", "Intensity", "Charge", "Quality"] 
 feature_elements_type = ["integer", "real", "real", "real", "integer", "real"]
-feature_elements_type_prefixes = ["", "", "", "", "", ""]
+feature_elements_types_prefixes = ["", "", "", "", "", ""]
 
 
 subordinate_elements = ["ID", "Feature_ref", "RT", "MZ", "Intensity", "Charge", "Quality"] 
 subordinate_elements_type = ["integer", "integer", "real", "real", "real", "integer", "real"]
-subordinate_elements_type_prefixes = ["", "", "", "", "", "", ""]
+subordinate_elements_types_prefixes = ["", "", "", "", "", "", ""]
+
+## database handling
+conn = sqlite3.connect('quantitative.db')
+#conn = sqlite3.connect(":memory:")
+print("Opened database successfully")
+c = conn.cursor()
 
 
 
@@ -228,6 +234,75 @@ with open('subordinates.csv', 'wb') as subordinatefile:
         else:
           subordinatewriter.writerow(userparams_elements_values)
 
-
-sql_header, sql_header_types = formatSQLEntries(subordinate_userparam_elements, userparams_elements_types)
+sql_header, sql_header_types = formatSQLEntries(subordinate_userparam_elements, userparams_elements_types, subordinate_elements_type, subordinate_elements_types_prefixes)
 createSQLTable(sql_header, sql_header_types, "subordinates.csv", "quantitative.db")
+
+
+
+##################################################################################################
+#
+#                         feature csv and table creation in quantitative.db                
+#
+##################################################################################################
+# feature file with parameters
+## export routine to save as csv
+## files: feature.csv
+
+with open('features.csv', 'wb') as featurefile:
+  featurewriter = csv.writer(featurefile, delimiter="\t", lineterminator='\n')
+  
+  # feature file with parameters
+  row_counter = 0
+  for feature in features:
+    # initialize list for current row entries 
+    currentrow = []
+    feature_userparams_labels = []
+    featureselect = (feature.getUniqueId(), feature.getRT(), feature.getMZ() , feature.getIntensity(), feature.getCharge(), feature.getOverallQuality())
+
+    subordinate_param_Elements = []
+    key = []
+    feature.getKeys(key)  #populate key
+
+    # build list of current row with featureselect and userparams for csv file
+    currentrow.extend(list(featureselect))
+    userparams_elements_types = []
+    for userparam in key:
+      #get label type of userparam
+      test_feat = feature.getMetaValue(userparam)
+      #print(str(type(test_feat)) + "\n")
+
+      #populate userparameter value type list
+      userparams_elements_types.append(test_feat.__class__.__name__)     
+
+      #populate header row of csv file
+      feature_userparams_labels.append(userparam)
+
+      #if(test_feat.__class__.__name__ == 'list'):
+      #  print("test auf list element")
+      #  print(str(feature.getMetaValue(userparam)))
+      #  currentrow.append(str(feature.getMetaValue(userparam)))
+      #else:
+      currentrow.append(feature.getMetaValue(userparam))
+      #concatenate feature elements with userparams to build header row of csv file 
+      feature_userparam_elements = feature_elements + feature_userparams_labels
+
+    if row_counter == 0:
+      row_counter = 1
+      featurefile.write('\t'.join(feature_userparam_elements) + '\n')
+      featurewriter.writerow(currentrow)
+      #print(len(currentrow))
+
+    else:
+      #print(len(currentrow))
+      featurewriter.writerow(currentrow)
+
+
+## feature table
+'''
+tablecolumnlabel = []
+tablecolumntype  = []
+sqlcreateTableElements = []
+'''
+
+sql_header, sql_header_types = formatSQLEntries(feature_userparam_elements, userparams_elements_types, feature_elements_type, feature_elements_types_prefixes)
+createSQLTable(sql_header, sql_header_types, "features.csv", "quantitative.db")
