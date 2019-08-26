@@ -65,6 +65,7 @@ def prefixLabel(csv_label_type):
       print(elem)
   return table_column_label, table_column_type
 
+
 def formatSQLEntries(elements, elements_types): #subordinate_userparam_elements, userparams_elements_types):
 # construct table entries from combined subordinate and userparameter elements
 # add prefixes for naming convention 
@@ -82,13 +83,36 @@ def formatSQLEntries(elements, elements_types): #subordinate_userparam_elements,
 
   for elem, s in enumerate(elements):
     sql_header.append(sql_column_types_prefixes[elem] + elements[elem])
-    
+  return sql_header, sql_header_types
 
-    # code snippet for factorization
-    #sql_table_elements.append(sql_column_types_prefixes[elem] + elements[elem]  + " " + sql_column_types[elem])   
-    
 
-  return sql_header, sql_header_types #, sql_table_elements
+
+def createSQLTable(sql_header, sql_header_types, csv_file, db_filename):
+  f = open(csv_file, 'rU')
+  reader = csv.reader(f, delimiter = '\t')
+  
+  conn = sqlite3.connect(db_filename)
+  c = conn.cursor()
+
+  table_string = []
+  for elem,s in enumerate(sql_header):
+    table_string.append(sql_header[elem] + " " + sql_header_types[elem])
+    
+  table_string = (', '.join(table_string))
+  create_table_string = "CREATE TABLE subordinates (" + table_string + ");"
+  c.execute(create_table_string)
+
+  dynamic_values = "INSERT INTO subordinates (" + \
+                       str(', '.join(sql_header)) + \
+                       ") VALUES (" + \
+                       str("?," * (len(sql_header)-1)) + "?" + \
+                       ");"
+
+  for line in reader:
+    c.execute(dynamic_values, tuple(line))
+
+  conn.commit()
+  conn.close()
 
 
 ## variable definition
@@ -136,12 +160,7 @@ print("Found " + str(features.size()) + " features")
 
 
 
-#print(type(features))
-dpo = features.getDataProcessing()
-#print(type(dpo))
-print("\n")
-
-
+#dpo = features.getDataProcessing()
 
 
 # Todo without loops
@@ -165,15 +184,13 @@ subordinate_elements_type_prefixes = ["", "", "", "", "", "", ""]
 
 
 
-
-
 ##################################################################################################
 #
 #                         subordinate csv and table creation in quantitative.db                
 #
 ##################################################################################################
 
-with open('subordinate.csv', 'wb') as subordinatefile:
+with open('subordinates.csv', 'wb') as subordinatefile:
   subordinatewriter = csv.writer(subordinatefile, delimiter='\t', lineterminator='\n')
 
   # subordinate file with userparameters
@@ -212,77 +229,5 @@ with open('subordinate.csv', 'wb') as subordinatefile:
           subordinatewriter.writerow(userparams_elements_values)
 
 
-
-
-
 sql_header, sql_header_types = formatSQLEntries(subordinate_userparam_elements, userparams_elements_types)
-
-
-def createSQLTable(sql_header, sql_header_types, csv_file, db_filename):
-  ## database handling
-  # build feature + userparam table
-  # build subordinate + userparam table
-  # build dataproc table
-
-  conn = sqlite3.connect(db_filename)
-  #print("Opened database successfully")
-  c = conn.cursor()
-
-  # clear existing table
-  #c.execute("DROP TABLE features")
-  #c.execute("DROP TABLE subordinates")
-  #c.execute("DROP TABLE dataproc")
-
-  table_string = []
-  for elem,s in enumerate(sql_header):
-    table_string.append(sql_header[elem] + " " + sql_header_types[elem])
-
-  table_string = (', '.join(table_string))
-  create_table_string = "CREATE TABLE subordinates (" + table_string + ");"
-  c.execute(create_table_string)
-  #c.execute("CREATE TABLE features (ID integer,Feature_ref integer,RT real,MZ real,Intensity real,Charge	integer,Quality real,MZ1	real,peak_apex_position real,native_id text,peak_apex_int real,total_xic real,width_at_50 real,logSN real,isotope_probability real);")
-
-
-
-  with open('subordinate.csv', 'rb') as subordinatefile:
-    dr = csv.DictReader(subordinatefile, delimiter='\t')
-    to_db = [(i['ID'],\
-              i['Feature_ref'],\
-              i['RT'],\
-              i['MZ'],\
-              i['Intensity'],\
-              i['Charge'],\
-              i['Quality'],\
-              i['_MZ'],\
-              i['peak_apex_position'],\
-              i['native_id'],\
-              i['peak_apex_int'],\
-              i['total_xic'],\
-              i['width_at_50'],\
-              i['logSN'],\
-              i['isotope_probability'],\
-    ) for i in dr]
-
-  c.executemany("INSERT INTO subordinates \
-    (ID,\
-    Feature_ref,\
-    RT,\
-    MZ,\
-    Intensity,\
-    Charge,\
-    Quality,\
-    _MZ,\
-    peak_apex_position,\
-    native_id,\
-    peak_apex_int,\
-    total_xic,\
-    width_at_50,\
-    logSN,\
-    isotope_probability\
-    ) VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", to_db)
-  conn.commit()
-  conn.close()
-
-
-createSQLTable(sql_header, sql_header_types, "subordinates.csv", "quantiative.db")
-
+createSQLTable(sql_header, sql_header_types, "subordinates.csv", "quantitative.db")
