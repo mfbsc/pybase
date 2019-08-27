@@ -189,6 +189,10 @@ print("Opened database successfully")
 c = conn.cursor()
 
 
+# clear existing table
+c.execute("DROP TABLE IF EXISTS features")
+c.execute("DROP TABLE IF EXISTS subordinates")
+c.execute("DROP TABLE IF EXISTS dataproc")
 
 ##################################################################################################
 #
@@ -306,3 +310,62 @@ sqlcreateTableElements = []
 
 sql_header, sql_header_types = formatSQLEntries(feature_userparam_elements, userparams_elements_types, feature_elements_type, feature_elements_types_prefixes)
 createSQLTable(sql_header, sql_header_types, "features.csv", "quantitative.db")
+
+
+
+
+
+
+
+
+
+dataproc = features.getDataProcessing()
+
+procActionSwitch = {
+  0: "DATA_PROCESSING",
+  1: "CHARGE_DECONVOLUTION",
+  2: "DEISOTOPING",
+  3: "SMOOTHING",
+  4: "CHARGE_CALCULATION",
+  5: "PRECURSOR_RECALCULATION",
+  6: "BASELINE_REDUCTION",
+  7: "PEAK_PICKING",
+  8: "ALIGNMENT",
+  9: "CALIBRATION", 
+  10:"NORMALIZATION",
+  11:"FILTERING",
+  12:"QUANTITATION",
+  13:"FEATURE_GROUPING",
+  14:"IDENTIFICATION_MAPPING",
+  15:"FORMAT_CONVERSION",
+  16:"CONVERSION_MZDATA",
+  17:"CONVERSION_MZML",
+  18:"CONVERSION_MZXML",
+  19:"CONVERSION_DTA",
+  20:"SIZE_OF_PROCESSINGACTION"
+}
+
+dataproc_elems = []
+dataproc_elems.append(str(features.getUniqueId()))
+
+for p in dataproc:
+  dataproc_elems.append(p.getSoftware().getName()) 
+  datatimestr = p.getCompletionTime().getDate() + p.getCompletionTime().getTime() 
+  dataproc_elems.append(datatimestr)
+  procAct = p.getProcessingActions()
+  for elem in procAct:
+    dataproc_elems.append(procActionSwitch[elem])
+
+with open('dataproc.csv', 'wb') as dataprocfile:
+  dataprocwriter = csv.writer(dataprocfile, delimiter="\t", lineterminator='\n')
+  dataprocfile.write("ID\tSOFTWARE\tDATATIME\tACTIONS\n")
+  dataprocfile.write('\t'.join(dataproc_elems) + '\n')
+
+conn = sqlite3.connect('quantitative.db')
+c = conn.cursor()
+
+sqlcreateTableElements = []
+sql_header = ["ID", "SOFTWARE", "DATATIME", "ACTIONS"]
+sql_header_types = ["text" ,"text" ,"text" , "text"]
+
+createSQLTable(sql_header, sql_header_types, "dataproc.csv", "quantitative.db")
