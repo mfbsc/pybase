@@ -10,3 +10,6 @@ should serve as template for features, dataprocessing tables
 04.09.2019: import.py is able to read tables,
 access of main feature setters almost for output.featureXML,
 subordinate access and getKeys() as well as conditionals not implemented
+
+05.08.2019: import.py stores about 80% of relevant information of featureXMLs
+condititional looping and subordinate case matching required
