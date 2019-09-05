@@ -92,31 +92,38 @@ def storeFeature(feature, feature_map):
   feature_map.push_back(feature)
   return feature_map
 
-
 #function definitions of labels
-def getUniqueId(int_nr):
-  return str(int_nr)
+def setUniqueId(feature, int_nr):
+  return feature.setUniqueId(int_nr)
 
-def setParentId(int_nr):
-  return str(int_nr)
+#def setParentId(int_nr):
+#  return setParentId( int_nr)
 
-def setRT(int_nr):
-  return str(int_nr)
+def setRT(feature, int_nr):
+  return feature.setRT(int_nr)
 
-def setMZ(double_nr):
-  return str(double_nr)
+def setMZ(feature, double_nr):
+  return feature.setMZ(double_nr)
 
-def setIntensity(double_nr):
-  return str(double_nr)
+def setIntensity(feature, double_nr):
+  return feature.setIntensity(double_nr)
 
-def setCharge(int_nr):
-  return str(int_nr)
+def setCharge(feature, int_nr):
+  return feature.setCharge(int_nr)
 
-def setOverallQuality(double_nr):
-  return str(double_nr)
+def setOverallQuality(feature, double_nr):
+  return feature.setOverallQuality(double_nr)
 
-def dummy_func(input):
-  return (input)
+def setWidth(feature, double_nr):
+  return feature.setWidth(double_nr)
+
+def setMetaValue(feature, String, DataValue):
+  return feature.setMetaValue(String, DataValue)
+
+def dummy_func(feature, input):
+  print(input)
+
+  
 
 def labelToFunction(label_arg):
   function = label_switcher.get(label_arg)
@@ -130,22 +137,27 @@ def labelToFunction(label_arg):
 def main():
 
   label_switcher = {
-    'ID' : getUniqueId,   
-    'Feature_ref' : setParentId, #(int),
+    'ID' : setUniqueId,   
+    'Feature_ref' : setUniqueId, #(int), setParentId
     'RT' : setRT, #(double)
     'MZ' : setMZ, #(double),
+    '_MZ' : setMZ, #(double),
     'Intensity' : setIntensity, #(double),
     'Charge' : setCharge, #(int),
     'Quality' : setOverallQuality, #(double),
-    '_MZ' : dummy_func,
+    'width_at_50' : setWidth
+  }
+
+  '''
+    '_MZ' : dummy_func #, 
     'native_id' : dummy_func,
-    'peak_apex_position' : dummy_func,
+    'peak_apex_position' : setMetaValue,
     'peak_apex_int' : dummy_func,
     'total_xic' : dummy_func,
-    'width_at_50' : dummy_func,
     'logSN' : dummy_func,
     'isotope_probability' : dummy_func
     } 
+  '''
 
   #start of main
   database_filename = "quantitative.db"
@@ -158,59 +170,35 @@ def main():
 
   # feature map instantiation
   fm = FeatureMap()
-  
-  '''
-  #feature = Feature()
-  
-  # test values
-  feature.setMZ(500.9)
-  feature.setRT(1500.9)
-  feature.setIntensity(509)
-  feature.setOverallQuality(8)
-  feature.setUniqueId(111334122223231411)
-  fm.push_back(feature)
-  '''
 
   table = readTableTuple(conn_mem, tables[2][0])
   header = getHeader(table)
   data = getData(table)
 
-  '''
-  for label in header:
-    if label in label_switcher:
-      print(label_switcher[label](5))
-      #print(label_switcher[label])
-  '''
-  #print(data[0][:])
-
 
   #print(len(header))
   #print(len(data[0][:]))
 
+  for (itemh,itemv) in itertools.izip(header, data[0][:]):
+    print(itemh + " " + str(itemv))
+  print("\n")
+
+  feature = Feature()
+  
   #for line in data:  # walk across labels and line elements to create featureXML entries 
   for (label,value) in itertools.izip_longest(header,data[0][:]):
     if label in label_switcher:
-      #print label, value
-      print(label_switcher[label](value))
-      #print(label_switcher[label])
+      #print(label)
+      label_switcher[label](feature, value)
+    else:
+      #print(label)
+      #print(type(label))
+      #print(value)
+      setMetaValue(feature, label, value)
+    #else:
+    #  print(label)
   
-  '''
-
-  #func = label_switcher.get(argument, 4)
-  print(label_switcher['ID'](5))
-  #print(func())
-  #exec(func)
-  '''  
-
-
-
-
-
-
-
-
-
-
+  fm.push_back(feature)
   # ensure uniqueness of ids
   fm.ensureUniqueId()
   FeatureXMLFile().store("test.featureXML", fm)
