@@ -1,4 +1,3 @@
-##
 ## ----------------------------------------------------------------------------
 ## $Maintainer: Matthias Fuchs$
 ## $Authors: Mattias Fuchs$
@@ -19,12 +18,8 @@ import csv
 import itertools
 import os
 import sqlite3
-import enum
-import numpy
-
 
 ## functions
-
 #create database connection
 def create_connection(db_file):
   try:
@@ -34,7 +29,6 @@ def create_connection(db_file):
     print(e)
   return None
 
-
 #return connection to database in RAM .                        
 def copyDatabaseToRAM(source_connection):
   script = ''.join(source_connection.iterdump())
@@ -42,8 +36,7 @@ def copyDatabaseToRAM(source_connection):
   dest_conn.executescript(script)
   return dest_conn
 
-
-#return table names in database 
+#return table names of database 
 #ar = [[str(item) for item in results] for results in tables] # for byte mode instead of text_factory
 def getTableNames(connection):
   connection.text_factory = str #return text data type
@@ -52,7 +45,7 @@ def getTableNames(connection):
   tables = cursor.fetchall()
   return tables
 
-#returns table as tuple with header and subsequent lines of data
+#return table as tuple with header and subsequent lines of data
 def readTableTuple(connection, table_name):
   cursor = connection.cursor()
   cursor.execute("SELECT * FROM " + table_name)
@@ -77,19 +70,6 @@ def setFunctionList(header):
   return datatypes
 
 
-
-#set feature with table values line
-'''
-def setFeature(input_from_lines):
-  feature = Feature()
-  #for element in input_from_lines:
-    
-    #lookup function in dictionary and execute
-    #ideas for improvement?
-
-  return feature
-'''
-
 #store feature 
 def storeFeature(feature, feature_map):
   feature_map.push_back(feature)
@@ -98,9 +78,6 @@ def storeFeature(feature, feature_map):
 #function definitions of labels
 def setUniqueId(feature, int_nr):
   return feature.setUniqueId(long(int_nr))
-
-#def setParentId(int_nr):
-#  return setParentId( int_nr)
 
 def setRT(feature, int_nr):
   return feature.setRT(int_nr)
@@ -125,7 +102,6 @@ def setMetaValue(feature, String, DataValue):
 
 def dummy_func(feature, input):
   print(input)
-
   
 
 def labelToFunction(label_arg):
@@ -163,20 +139,6 @@ def setFeature(feature, header, data):
 ##############################################################################
 
 def main():
-
-
-
-  '''
-    '_MZ' : dummy_func #, 
-    'native_id' : dummy_func,
-    'peak_apex_position' : setMetaValue,
-    'peak_apex_int' : dummy_func,
-    'total_xic' : dummy_func,
-    'logSN' : dummy_func,
-    'isotope_probability' : dummy_func
-    } 
-  '''
-
   #start of main
   database_filename = "quantitative.db"
   conn_db = create_connection(database_filename)
@@ -186,8 +148,8 @@ def main():
   tables = getTableNames(conn_mem)
   table = readTableTuple(conn_mem, tables[1][0])
 
-  # feature map instantiation
-  #fm = FeatureMap()
+
+  bool_subordinates = False
 
   # set table by name 
   for index, elem in enumerate(tables):
@@ -198,80 +160,22 @@ def main():
       table_features = readTableTuple(conn_mem, tables[index][0])
     elif elem_string == 'subordinates':
       table_subordinates = readTableTuple(conn_mem, tables[index][0])
+      bool_subordinates = True
     else:
       print("table not used yet")
       break
 
 
-  '''
-  ###############################################################################
-  #                        write dataproc to featureXML                         #
-  ###############################################################################
-  '''
-  
-  '''
-  # write dataproc to featureXML
-  table_data_proc = readTableTuple(conn_mem, tables[0][0])
-  header = getHeader(table_data_proc)
-  data = getData(table_data_proc)
-  '''
-  
-
-  ##### DataProcessing
-  #fm.setDataProcessing(["test","test"])
-  # set dataproc entries
-
-  #dataproc = fm.setDataProcessing.setCompletionTime()
-  #fm.DataProcessing.Software.setSoftware("test") #('1999-12-31')
-
-  '''
-  for p in dataproc:
-    dataproc_elems.append(p.getSoftware().getName()) 
-    #datastr = p.getCompletionTime().getDate()# + p.getCompletionTime().getTime() 
-    datastr = p.getCompletionTime().getDate()# + p.getCompletionTime().getTime() 
-    timestr = p.getCompletionTime().getTime() 
-    #dataproc_elems.append(datatimestr)
-    dataproc_elems.append(datastr)
-    dataproc_elems.append(timestr)
-    procAct = p.getProcessingActions()
-    for elem in procAct:
-      dataproc_elems.append(procActionSwitch[elem])
-  '''
-
-
-
   ###############################################################################
   #                        write features to featureXML                         #
   ###############################################################################
-  '''
-  header_features = getHeader(table_features)
-  data_features = getData(table_features)
-  
-  for line in data_features:
-    feature = Feature()
-    for (label,value) in itertools.izip_longest(header_features,line):
-      if label in label_switcher:
-        #print(label)
-        label_switcher[label](feature, value)
-      else:
-        #print(label)
-        #print(type(label))
-        #print(value)
-        setMetaValue(feature, label, value)
-    #else:
-    #  print(label)
-    fm.push_back(feature)
-    # ensure uniqueness of ids
-    fm.ensureUniqueId()
-  '''
 
 
   header_features = getHeader(table_features)
   data_features = getData(table_features)
 
-  print(len(tables))
 
-  if len(tables) >= 3:
+  if bool_subordinates:
     header_subordinates = getHeader(table_subordinates)
     data_subordinates = getData(table_subordinates)
     # contains list of feature ids with subordinates  
@@ -289,131 +193,47 @@ def main():
     feature = Feature()
     setFeature(feature, header_features, feature_line)
     feature_id = int(feature_line[0])
-    subord_list = []
-    if len(tables) > 2:
+    if bool_subordinates:
+      subord_list = []
       for subordinate_line in data_subordinates:
+        # check for feature id in subordinate 
         if feature_id == int(subordinate_line[1]):
           subordinate = Feature()
           subord_line = subordinate_line[:1] + subordinate_line[2:]
-          
+          #print(subord_line)
           for (label,value) in itertools.izip_longest(header_subordinates_list,subord_line):
             if label in label_switcher:
               label_switcher[label](subordinate, value)
             else:
               setMetaValue(subordinate, label, value)
-          #fm.push_back(subordinate)
           # ensure uniqueness of ids
           #fm.ensureUniqueId()
           subord_list.append(subordinate)
-          print(len(subord_list))
           #feature.setSubordinates()
+          
+          #fm.push_back(subordinate)
+          print(len(subord_list))
+      
         feature.setSubordinates(subord_list)
-
+      fm.ensureUniqueId()
+      fm.push_back(subordinate)
 
       
 
-      #print(header_subordinates_list[0])
-      #print(int(subord_line[0]))
-      #subordinate_feature = Feature()
-      #setFeature(subordinate_feature, header_subordinates_list, subord_line)
-      #feature.setSubordinates()
 
 
-
-
-  '''
-  ###############################################################################
-  #                      write subordinates to featureXML                       #
-  ###############################################################################
-  header_subordinates = getHeader(table_subordinates)
-  data_subordinates = getData(table_subordinates)
-
-  #print(data_subordinates[0][1])
-  #print(data_features[0][:])
-  #print([int(row[0]) for row in data_features])
-  features_Ids = [int(row[0]) for row in data_features]
-  print(features_Ids)
-
-  header_subordinates_list = header_subordinates[:1] + header_subordinates[2:]
-  print(header_subordinates_list)
-  #print(header_subordinates)
-
-  
-  #find entries in 2nd column of data_subordinates which correspoond
-  #to feature_ref in data_features and add their corresponding subordinates
-  #subordinates = feature.getSubordinates()
-  
-  for line in data_subordinates:
-    #print(type(line))
-    #print(line[1])
-    if int(line[1]) in features_Ids:
-      print("is in")
-      print(line)
-      subord_line = line[:1] + line[2:]
-      print(subord_line)
-      feature = Feature()
-      for (label,value) in itertools.izip_longest(header_subordinates_list,subord_line):
-        if label in label_switcher:
-          #print(label)
-          label_switcher[label](feature, value)
-        else:
-          #print(label)
-          #print(type(label))
-          #print(value)
-          setMetaValue(feature, label, value)
-            #  print(label)
-      fm.push_back(feature)
-      # ensure uniqueness of ids
-      fm.ensureUniqueId()
-  
-  '''
   uniqueId = long(data_features[0][0])
-  print(uniqueId)
+  #print(uniqueId)
 
   # set featuremap Id  
   fm.setUniqueId(uniqueId)
 
-
-
-
-
+  #store as featureXML
   FeatureXMLFile().store("test.featureXML", fm)
   
-
-  '''
-  for elem in table_dict[item][0]:
-    print(elem)
-    #if elem == "ID":
-    if elem in label_switch:
-      print(elem)
-      print("true")
-
-  feature = Feature()    
-  table_dict = {}
-
-  for elem in tables:
-    # start populating FeatureXML files with values of corresponding tables
-    #print(elem[0])
-    table_dict[elem] = readTableTuple(conn_mem, elem[0])
-    print(type(table_dict[elem]))
-    print(len(table_dict[elem]))
-
-  for item in table_dict:
-    #print(type(item))
-    #print(item[0], table_dict[item][0])     # 0 returns header of table
-    for elem in table_dict[item][0]:
-      print(elem)
-      #if elem == "ID":
-      if elem in label_switch:
-        print(elem)
-        print("true")
-  '''
-
-  
-
-
   # close database
   conn_mem.close()
+
   # end of main
 
 
@@ -455,3 +275,150 @@ rows = cur.fetchall()
   #find entries in 2nd column of data_subordinates which correspoond
   #to feature_ref in data_features and add their corresponding subordinates
   #subordinates = feature.getSubordinates()
+
+
+'''
+header_features = getHeader(table_features)
+data_features = getData(table_features)
+
+for line in data_features:
+  feature = Feature()
+  for (label,value) in itertools.izip_longest(header_features,line):
+    if label in label_switcher:
+      #print(label)
+      label_switcher[label](feature, value)
+    else:
+      #print(label)
+      #print(type(label))
+      #print(value)
+      setMetaValue(feature, label, value)
+  #else:
+  #  print(label)
+  fm.push_back(feature)
+  # ensure uniqueness of ids
+  fm.ensureUniqueId()
+'''
+
+
+
+
+
+
+
+'''
+for elem in table_dict[item][0]:
+  print(elem)
+  #if elem == "ID":
+  if elem in label_switch:
+    print(elem)
+    print("true")
+
+feature = Feature()    
+table_dict = {}
+
+for elem in tables:
+  # start populating FeatureXML files with values of corresponding tables
+  #print(elem[0])
+  table_dict[elem] = readTableTuple(conn_mem, elem[0])
+  print(type(table_dict[elem]))
+  print(len(table_dict[elem]))
+
+for item in table_dict:
+  #print(type(item))
+  #print(item[0], table_dict[item][0])     # 0 returns header of table
+  for elem in table_dict[item][0]:
+    print(elem)
+    #if elem == "ID":
+    if elem in label_switch:
+      print(elem)
+      print("true")
+'''
+
+
+
+
+'''
+###############################################################################
+#                      write subordinates to featureXML                       #
+###############################################################################
+header_subordinates = getHeader(table_subordinates)
+data_subordinates = getData(table_subordinates)
+
+#print(data_subordinates[0][1])
+#print(data_features[0][:])
+#print([int(row[0]) for row in data_features])
+features_Ids = [int(row[0]) for row in data_features]
+print(features_Ids)
+
+header_subordinates_list = header_subordinates[:1] + header_subordinates[2:]
+print(header_subordinates_list)
+#print(header_subordinates)
+
+
+#find entries in 2nd column of data_subordinates which correspoond
+#to feature_ref in data_features and add their corresponding subordinates
+#subordinates = feature.getSubordinates()
+
+for line in data_subordinates:
+  #print(type(line))
+  #print(line[1])
+  if int(line[1]) in features_Ids:
+    print("is in")
+    print(line)
+    subord_line = line[:1] + line[2:]
+    print(subord_line)
+    feature = Feature()
+    for (label,value) in itertools.izip_longest(header_subordinates_list,subord_line):
+      if label in label_switcher:
+        #print(label)
+        label_switcher[label](feature, value)
+      else:
+        #print(label)
+        #print(type(label))
+        #print(value)
+        setMetaValue(feature, label, value)
+          #  print(label)
+    fm.push_back(feature)
+    # ensure uniqueness of ids
+    fm.ensureUniqueId()
+
+'''
+
+
+
+
+
+'''
+###############################################################################
+#                        write dataproc to featureXML                         #
+###############################################################################
+'''
+
+'''
+# write dataproc to featureXML
+table_data_proc = readTableTuple(conn_mem, tables[0][0])
+header = getHeader(table_data_proc)
+data = getData(table_data_proc)
+'''
+
+
+##### DataProcessing
+#fm.setDataProcessing(["test","test"])
+# set dataproc entries
+
+#dataproc = fm.setDataProcessing.setCompletionTime()
+#fm.DataProcessing.Software.setSoftware("test") #('1999-12-31')
+
+'''
+for p in dataproc:
+  dataproc_elems.append(p.getSoftware().getName()) 
+  #datastr = p.getCompletionTime().getDate()# + p.getCompletionTime().getTime() 
+  datastr = p.getCompletionTime().getDate()# + p.getCompletionTime().getTime() 
+  timestr = p.getCompletionTime().getTime() 
+  #dataproc_elems.append(datatimestr)
+  dataproc_elems.append(datastr)
+  dataproc_elems.append(timestr)
+  procAct = p.getProcessingActions()
+  for elem in procAct:
+    dataproc_elems.append(procActionSwitch[elem])
+'''
