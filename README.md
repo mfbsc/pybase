@@ -1,6 +1,6 @@
 ## Table of Contents
 
-* [Bachelor Project](#Bachelor Project)
+* [Bachelor Project](#Bachelor-Project)
 * [Breakdown](#Breakdown)
 * [Timeline](#Timeline)
 
