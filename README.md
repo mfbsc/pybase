@@ -11,7 +11,7 @@ class, written for the [OpenMS framework](https://www.openms.de/), in Python usi
 its interface [pyOpenMS](https://pyopenms.readthedocs.io/en/latest/index.html).
 
 ## Breakdown
-**pyopenms to openms
+**pyopenms to openms**
 
 project parts
 1. generate export script of FeatureMap objects in XML data format
